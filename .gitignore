@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+.drone/
+
+# Logs & temporary files
+logs/
+temp/
+results/
+*.log
+
+# Models
+models/
+*.pt
+*.onnx
+
+# Environment
+.env
+.env.*
+
+# VS Code
+.vscode/

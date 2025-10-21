@@ -1,0 +1,29 @@
+# Core FastAPI + ASGI server
+fastapi
+uvicorn[standard]
+
+# Uploads & file handling
+python-multipart
+aiofiles
+pillow
+
+# Core CV/ML stack
+opencv-python-headless
+numpy==1.26.4
+torch
+tqdm
+seaborn
+pandas
+
+# Supabase + environment
+python-dotenv
+supabase
+requests
+
+# Optional but useful for Render/DevOps
+gunicorn
+
+
+ultralytics==8.3.22
+onnxruntime
+
