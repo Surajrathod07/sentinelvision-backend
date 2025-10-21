@@ -8,6 +8,16 @@ import io
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# --- Load Environment Variables ---
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+# --- Initialize Supabase Client ---
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
 
@@ -22,6 +32,8 @@ app.add_middleware(
 
 # --- Model Directory ---
 MODEL_DIR = "models"
+os.makedirs(MODEL_DIR, exist_ok=True)
+
 AVAILABLE_MODELS = [
     "mosquito_detection_1.pt",
     "mosquito_detection_2.pt",
@@ -29,13 +41,34 @@ AVAILABLE_MODELS = [
     "yolov8n.onnx"
 ]
 
+# --- Helper: Download from Supabase ---
+def download_from_supabase(model_name):
+    try:
+        print(f"[⬇️] Downloading {model_name} from Supabase Storage...")
+        response = supabase.storage.from_("models").download(model_name)
+        if response:
+            file_path = os.path.join(MODEL_DIR, model_name)
+            with open(file_path, "wb") as f:
+                f.write(response)
+            print(f"[✅] Downloaded and saved: {model_name}")
+            return True
+        else:
+            print(f"[❌] Model not found in Supabase storage: {model_name}")
+            return False
+    except Exception as e:
+        print(f"[⚠️] Failed to download {model_name}: {e}")
+        return False
+
 # --- Load Models ---
 models = {}
 for model_name in AVAILABLE_MODELS:
     path = os.path.join(MODEL_DIR, model_name)
     if not os.path.exists(path):
-        print(f"[⚠️] Missing model: {model_name}")
-        continue
+        print(f"[⚠️] Missing model locally: {model_name}")
+        # Try to download from Supabase
+        downloaded = download_from_supabase(model_name)
+        if not downloaded:
+            continue
 
     try:
         if model_name.endswith(".onnx"):
@@ -56,7 +89,6 @@ class PredictRequest(BaseModel):
 def draw_boxes(image: Image.Image, detections, labels):
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
-
     for det in detections:
         x1, y1, x2, y2, conf, cls = det
         label = f"{labels[int(cls)]} {conf:.2f}" if labels else f"ID {int(cls)} {conf:.2f}"
@@ -76,20 +108,17 @@ async def predict(req: PredictRequest):
     model = models[req.model_name]
 
     try:
-        # --- For YOLOv8 (.pt) ---
         if req.model_name.endswith(".pt"):
             results = model(image)
             detections = results[0].boxes.data.cpu().numpy()
             labels = results[0].names
 
-        # --- For ONNX ---
         elif req.model_name.endswith(".onnx"):
             sess = model
             input_name = sess.get_inputs()[0].name
             img_resized = image.resize((640, 640))
             img_np = np.array(img_resized).transpose(2, 0, 1)
             img_np = np.expand_dims(img_np, 0).astype(np.float32) / 255.0
-
             outputs = sess.run(None, {input_name: img_np})
             detections = outputs[0][0] if isinstance(outputs[0], list) else outputs[0]
             labels = None
@@ -97,15 +126,12 @@ async def predict(req: PredictRequest):
         else:
             raise HTTPException(status_code=400, detail="Unsupported model type")
 
-        # --- Annotate Image ---
         annotated = draw_boxes(image.copy(), detections, labels)
 
-        # --- Convert to base64 ---
         buf = io.BytesIO()
         annotated.save(buf, format="JPEG")
         annotated_base64 = base64.b64encode(buf.getvalue()).decode()
 
-        # --- Build response ---
         return {
             "model": req.model_name,
             "detections": len(detections),
@@ -117,4 +143,4 @@ async def predict(req: PredictRequest):
 
 @app.get("/")
 def home():
-    return {"status": "🟢 SentinelVision API running with YOLOv8 + ONNX models!"}
+    return {"status": "🟢 SentinelVision API running with Supabase Model Loading!"}
