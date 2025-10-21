@@ -1,11 +1,12 @@
 # Core FastAPI + ASGI server
-fastapi
-uvicorn[standard]
+fastapi==0.114.0
+uvicorn[standard]==0.24.0
+pydantic==2.6.0
 
 # Uploads & file handling
 python-multipart
 aiofiles
-pillow
+pillow==10.0.1
 
 # Core CV/ML stack
 opencv-python-headless
@@ -23,7 +24,6 @@ requests
 # Optional but useful for Render/DevOps
 gunicorn
 
-
+# YOLO & ONNX
 ultralytics==8.3.22
 onnxruntime
-
